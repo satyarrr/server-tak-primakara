@@ -7,9 +7,8 @@ const { v4: uuidv4 } = require("uuid");
 const jwt = require("jsonwebtoken");
 require("dotenv").config();
 
-const supabaseUrl = "https://cqovamdnptamfeftpvml.supabase.co";
-const supabaseKey =
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNxb3ZhbWRucHRhbWZlZnRwdm1sIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MDY3ODI0ODksImV4cCI6MjAyMjM1ODQ4OX0.br1jhVfkA9kbsfqda5-H2DNo2FE1Kwr6DehnrQ0LHWc";
+const supabaseUrl = process.env.SUPABASE_URL;
+const supabaseKey = process.env.SUPABASE_KEY;
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 const app = express();
@@ -20,7 +19,7 @@ app.use(cors());
 const corsOptions = {
   origin: "*", // semua bisa akses , nantikuubah ke domain
 };
-// // Agar bisa menerima payload berupa JSON
+
 app.use(cors(corsOptions));
 app.use(bodyParser.json());
 app.use(
@@ -100,7 +99,7 @@ app.post(
 
         const newCertificate = {
           user_id: users.user_id,
-          title: "Certificate from admin 1",
+          title: "Certificate From Kemahasiswaan",
           file_path: image_url,
           status: "approve",
           tag_id: tags.tag_id,
@@ -414,6 +413,27 @@ app.get("/certificates/:user_id", async (req, res) => {
     }
 
     res.status(200).json({ success: true, certificates });
+  } catch (error) {
+    console.error("Error:", error.message);
+    res.status(500).json({ success: false, error: "Internal Server Error" });
+  }
+});
+
+app.delete("/certificates/:cert_id", async (req, res) => {
+  try {
+    const { cert_id } = req.params;
+    const { data, error } = await supabase
+      .from("certificates")
+      .delete()
+      .eq("cert_id", cert_id);
+
+    if (error) {
+      throw error;
+    }
+
+    res
+      .status(200)
+      .json({ success: true, message: "Certificate deleted successfully" });
   } catch (error) {
     console.error("Error:", error.message);
     res.status(500).json({ success: false, error: "Internal Server Error" });
