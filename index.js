@@ -387,17 +387,20 @@ app.patch("/certificate/:id", async (req, res) => {
 
 app.get("/categories", async (req, res) => {
   try {
-    const { data: categories, error } = await supabase
-      .from("categories")
-      .select("*");
+    const { data, error } = await supabase.from("categories").select("*");
 
     if (error) {
       throw error;
     }
-    res.status(200).json({ success: true, categories });
+
+    const categories = data.map((category) => ({
+      id: category.category_id,
+      name: category.name,
+    }));
+
+    res.status(200).json(categories);
   } catch (error) {
-    console.log("error:", error.message);
-    res.status(500).json({ success: false, error: "internal server error" });
+    res.status(500).json({ error: error.message });
   }
 });
 
@@ -520,6 +523,36 @@ app.post("/categories", async (req, res) => {
   }
 });
 
+app.get("/categories/:category_id/tags", async (req, res) => {
+  try {
+    const { category_id } = req.params; // Get the category_id from URL parameters
+
+    if (!category_id) {
+      return res.status(400).json({ error: "Category ID is required" });
+    }
+
+    const { data, error } = await supabase
+      .from("tags")
+      .select("*")
+      .eq("category_id", category_id); // Filter tags by category_id
+
+    if (error) {
+      throw error;
+    }
+
+    const tags = data.map((tag) => ({
+      id: tag.tag_id,
+      name: tag.name,
+      value: tag.value,
+      category_id: tag.category_id,
+    }));
+
+    res.status(200).json(tags);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Untuk GET TAGS
 app.get("/tags", async (req, res) => {
   try {
@@ -554,7 +587,7 @@ app.get("/tagsall", async (req, res) => {
   }
 });
 
-const PORT = process.env.PORT || 2000;
+const PORT = process.env.PORT;
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
 });
