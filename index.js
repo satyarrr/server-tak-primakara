@@ -5,6 +5,7 @@ const XLSX = require("xlsx");
 const cors = require("cors");
 const { v4: uuidv4 } = require("uuid");
 const jwt = require("jsonwebtoken");
+const moment = require("moment");
 require("dotenv").config();
 
 const supabaseUrl = process.env.SUPABASE_URL;
@@ -124,81 +125,254 @@ app.post(
   }
 );
 
+// app.get("/user/:user_id/mahasiswa", async (req, res) => {
+//   try {
+//     // Fetch user data
+//     const { data: userData, error: userError } = await supabase
+//       .from("users")
+//       .select("full_name, nim")
+//       .eq("user_id", req.params.user_id)
+//       .single();
+
+//     if (userError || !userData) {
+//       throw new Error("User not found");
+//     }
+
+//     // Fetch certificates data for the user
+//     const { data: certificates, error: certError } = await supabase
+//       .from("certificates")
+//       .select("tag_id, title")
+//       .eq("user_id", req.params.user_id)
+//       .eq("status", "approve");
+
+//     if (certError) {
+//       throw new Error("Failed to fetch certificates data");
+//     }
+
+//     // console.log("certificate", certificates);
+//     const tagIds = certificates.map((certificate) => certificate.tag_id);
+
+//     // Fetch tags data for the certificates
+//     const { data: tags, error: tagsError } = await supabase
+//       .from("tags")
+//       .select("tag_id, name, value, category_id")
+//       .in("tag_id", tagIds);
+
+//     if (tagsError) {
+//       throw new Error("Failed to fetch tags data");
+//     }
+
+//     // Fetch categories data for the tags
+//     const { data: categories, error: categoriesError } = await supabase
+//       .from("categories")
+//       .select("category_id, name, min_point");
+
+//     if (categoriesError) {
+//       throw new Error("Failed to fetch categories data");
+//     }
+
+//     // Calculate total points for each category
+//     const totalPoints = certificates.reduce((temp, certificate) => {
+//       const tag = tags.find((tag) => certificate.tag_id == tag.tag_id);
+//       const category = categories.find(
+//         (category) => category.category_id === tag.category_id
+//       );
+
+//       if (!temp[category.name]) {
+//         temp[category.name] = tag.value;
+//       } else {
+//         temp[category.name] += tag.value;
+//       }
+
+//       return temp;
+//     }, {});
+
+//     const min_point = categories.min_point;
+
+//     res.status(200).json({
+//       success: true,
+//       user: {
+//         full_name: userData.full_name,
+//         nim: userData.nim,
+//         totalPoints: totalPoints,
+//         cat: min_point,
+//       },
+//     });
+//   } catch (error) {
+//     console.error("Error:", error.message);
+//     res.status(500).json({ success: false, error: "Internal Server Error" });
+//   }
+// });
+
+// app.get("/user/:user_id/mahasiswa", async (req, res) => {
+//   try {
+//     // Fetch user data
+//     const { data: userData, error: userError } = await supabase
+//       .from("users")
+//       .select("full_name, nim")
+//       .eq("user_id", req.params.user_id)
+//       .single();
+
+//     if (userError || !userData) {
+//       throw new Error("User not found");
+//     }
+
+//     // Fetch certificates data for the user
+//     const { data: certificates, error: certError } = await supabase
+//       .from("certificates")
+//       .select("tag_id, title")
+//       .eq("user_id", req.params.user_id)
+//       .eq("status", "approve");
+
+//     if (certError) {
+//       throw new Error("Failed to fetch certificates data");
+//     }
+
+//     // Get tagIds from certificates
+//     const tagIds = certificates.map((certificate) => certificate.tag_id);
+
+//     // Fetch tags data for the certificates
+//     const { data: tags, error: tagsError } = await supabase
+//       .from("tags")
+//       .select("tag_id, name, value, category_id")
+//       .in("tag_id", tagIds);
+
+//     if (tagsError) {
+//       throw new Error("Failed to fetch tags data");
+//     }
+
+//     // Fetch categories data for the tags
+//     const { data: categories, error: categoriesError } = await supabase
+//       .from("categories")
+//       .select("category_id, name, min_point");
+
+//     if (categoriesError) {
+//       throw new Error("Failed to fetch categories data");
+//     }
+
+//     // Initialize totalPoints with all categories and min_point
+//     const totalPoints = {};
+//     categories.forEach((category) => {
+//       totalPoints[category.name] = { points: 0, min_point: category.min_point };
+//     });
+
+//     // Calculate total points for each category
+//     certificates.forEach((certificate) => {
+//       const tag = tags.find((tag) => certificate.tag_id == tag.tag_id);
+//       const category = categories.find(
+//         (category) => category.category_id === tag.category_id
+//       );
+//       if (category) {
+//         totalPoints[category.name].points += tag.value;
+//       }
+//     });
+
+//     // Prepare the response
+//     res.status(200).json({
+//       success: true,
+//       user: {
+//         full_name: userData.full_name,
+//         nim: userData.nim,
+//         totalPoints: totalPoints,
+//       },
+//     });
+//   } catch (error) {
+//     console.error("Error:", error.message);
+//     res.status(500).json({ success: false, error: "Internal Server Error" });
+//   }
+// });
 app.get("/user/:user_id/mahasiswa", async (req, res) => {
+  const { user_id } = req.params;
+
+  if (!user_id) {
+    return res
+      .status(400)
+      .json({ success: false, error: "User ID is required" });
+  }
+
   try {
-    // Fetch user data
-    const { data: userData, error: userError } = await supabase
-      .from("users")
-      .select("full_name, nim")
-      .eq("user_id", req.params.user_id)
-      .single();
-
-    if (userError || !userData) {
-      throw new Error("User not found");
+    const user = await getUserData(user_id);
+    if (!user) {
+      return res.status(404).json({ success: false, error: "User not found" });
     }
 
-    // Fetch certificates data for the user
-    const { data: certificates, error: certError } = await supabase
-      .from("certificates")
-      .select("tag_id, title")
-      .eq("user_id", req.params.user_id)
-      .eq("status", "approve");
+    const certificates = await getCertificates(user_id);
+    const tags = await getTags(certificates);
+    const categories = await getCategories();
 
-    if (certError) {
-      throw new Error("Failed to fetch certificates data");
-    }
-
-    // console.log("certificate", certificates);
-    const tagIds = certificates.map((certificate) => certificate.tag_id);
-
-    // Fetch tags data for the certificates
-    const { data: tags, error: tagsError } = await supabase
-      .from("tags")
-      .select("tag_id, name, value, category_id")
-      .in("tag_id", tagIds);
-
-    if (tagsError) {
-      throw new Error("Failed to fetch tags data");
-    }
-
-    // Fetch categories data for the tags
-    const { data: categories, error: categoriesError } = await supabase
-      .from("categories")
-      .select("category_id, name");
-
-    if (categoriesError) {
-      throw new Error("Failed to fetch categories data");
-    }
-
-    // Calculate total points for each category
-    const totalPoints = certificates.reduce((temp, certificate) => {
-      const tag = tags.find((tag) => certificate.tag_id == tag.tag_id);
-      const category = categories.find(
-        (category) => category.category_id === tag.category_id
-      );
-
-      if (!temp[category.name]) {
-        temp[category.name] = tag.value;
-      } else {
-        temp[category.name] += tag.value;
-      }
-
-      return temp;
-    }, {});
+    const totalPoints = calculateTotalPoints(certificates, tags, categories);
 
     res.status(200).json({
-      success: true,
-      user: {
-        full_name: userData.full_name,
-        nim: userData.nim,
-        totalPoints: totalPoints,
-      },
+      full_name: user.full_name,
+      nim: user.nim,
+      totalPoints: totalPoints,
     });
   } catch (error) {
     console.error("Error:", error.message);
     res.status(500).json({ success: false, error: "Internal Server Error" });
   }
 });
+
+const getUserData = async (user_id) => {
+  const { data, error } = await supabase
+    .from("users")
+    .select("full_name, nim")
+    .eq("user_id", user_id)
+    .single();
+
+  if (error) throw new Error("Failed to fetch user data");
+  return data;
+};
+
+const getCertificates = async (user_id) => {
+  const { data, error } = await supabase
+    .from("certificates")
+    .select("tag_id, title")
+    .eq("user_id", user_id)
+    .eq("status", "approve");
+
+  if (error) throw new Error("Failed to fetch certificates data");
+  return data;
+};
+
+const getTags = async (certificates) => {
+  const tagIds = certificates.map((certificate) => certificate.tag_id);
+  const { data, error } = await supabase
+    .from("tags")
+    .select("tag_id, name, value, category_id")
+    .in("tag_id", tagIds);
+
+  if (error) throw new Error("Failed to fetch tags data");
+  return data;
+};
+
+const getCategories = async () => {
+  const { data, error } = await supabase
+    .from("categories")
+    .select("category_id, name, min_point");
+
+  if (error) throw new Error("Failed to fetch categories data");
+  return data;
+};
+
+const calculateTotalPoints = (certificates, tags, categories) => {
+  const totalPoints = {};
+  categories.forEach((category) => {
+    totalPoints[category.name] = { points: 0, min_point: category.min_point };
+  });
+
+  certificates.forEach((certificate) => {
+    const tag = tags.find((tag) => certificate.tag_id == tag.tag_id);
+    const category = categories.find(
+      (category) => category.category_id === tag.category_id
+    );
+    if (category) {
+      totalPoints[category.name].points += tag.value;
+    }
+  });
+
+  return totalPoints;
+};
 
 app.get("/users/mahasiswa", async (req, res) => {
   try {
@@ -385,19 +559,92 @@ app.patch("/certificate/:id", async (req, res) => {
   }
 });
 
-app.get("/categories", async (req, res) => {
+app.get("/management", async (req, res) => {
   try {
-    const { data: categories, error } = await supabase
+    // Ambil semua kategori (categories)
+    const { data: categoriesData, error: categoriesError } = await supabase
       .from("categories")
       .select("*");
+
+    if (categoriesError) {
+      throw categoriesError;
+    }
+
+    // Ambil semua activities beserta kategori dan tags
+    const { data: activitiesData, error: activitiesError } = await supabase
+      .from("activities")
+      .select("*");
+
+    if (activitiesError) {
+      throw activitiesError;
+    }
+
+    // Ambil semua tags
+    const { data: tagsData, error: tagsError } = await supabase
+      .from("tags")
+      .select("*");
+
+    if (tagsError) {
+      throw tagsError;
+    }
+
+    // Susun data sesuai dengan struktur yang diminta
+    const combinedData = categoriesData.map((category) => {
+      // Filter activities yang memiliki category_id sesuai dengan kategori saat ini
+      const categoryActivities = activitiesData
+        .filter((activity) => activity.category_id === category.category_id)
+        .map((activity) => {
+          // Ambil tags yang terkait dengan activity saat ini
+          const activityTags = tagsData
+            .filter((tag) => tag.activity_id === activity.activity_id)
+            .map((tag) => ({
+              id: tag.tag_id,
+              name: tag.name,
+              value: tag.value,
+            }));
+
+          // Return activity dengan tags-nya
+          return {
+            id: activity.activity_id,
+            name: activity.name,
+            // category_id: activity.category_id,
+            tags: activityTags,
+          };
+        });
+
+      // Return category dengan activities yang terkait
+      return {
+        id: category.category_id,
+        name: category.name,
+        min: category.min_point,
+        activities: categoryActivities,
+      };
+    });
+
+    res.status(200).json(combinedData);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get("/categories", async (req, res) => {
+  try {
+    const { data, error } = await supabase.from("categories").select("*");
 
     if (error) {
       throw error;
     }
-    res.status(200).json({ success: true, categories });
+
+    const categories = data.map((category) => ({
+      id: category.category_id,
+      name: category.name,
+      min: category.min_point,
+    }));
+    categories.sort((a, b) => a.name.localeCompare(b.name));
+
+    res.status(200).json(categories);
   } catch (error) {
-    console.log("error:", error.message);
-    res.status(500).json({ success: false, error: "internal server error" });
+    res.status(500).json({ error: error.message });
   }
 });
 
@@ -443,22 +690,59 @@ app.delete("/certificates/:cert_id", async (req, res) => {
 app.post("/upload", upload.single("file"), async (req, res) => {
   try {
     const file = req.file;
-    const { user_id, title, status, tag_id } = req.body;
-    const filePath = `${user_id}/${uuidv4()}_${file.originalname}`;
+    const { user_id, title, status, tag_id, activity_date } = req.body;
 
-    const { data, error } = await supabase.storage
+    if (!file) {
+      return res
+        .status(400)
+        .json({ success: false, error: "No file uploaded" });
+    }
+    if (!user_id || !title || !tag_id || !activity_date) {
+      return res
+        .status(400)
+        .json({ success: false, error: "Missing required fields" });
+    }
+
+    const filePath = `${user_id}/${uuidv4()}_${file.originalname}`;
+    const formattedActivityDate = moment(activity_date).format();
+
+    // Check if there's already a certificate with the same tag_id and activity_date
+    const { data: existingCertificates, error: queryError } = await supabase
+      .from("certificates")
+      .select("*")
+      .eq("tag_id", tag_id)
+      .eq("activity_date", formattedActivityDate);
+
+    if (queryError) {
+      throw queryError;
+    }
+
+    // If there are existing certificates with the same tag_id and activity_date, reject the upload
+    if (existingCertificates && existingCertificates.length > 0) {
+      return res.status(400).json({
+        success: false,
+        error:
+          "Certificate with the same tag on the same activity date already exists",
+      });
+    }
+
+    const { data: uploadData, error: uploadError } = await supabase.storage
       .from("certificates")
       .upload(filePath, file.buffer, {
         contentType: file.mimetype,
       });
 
-    if (error) {
-      throw error;
+    if (uploadError) {
+      throw uploadError;
     }
-    const {
-      data: { publicUrl },
-      error: urlError,
-    } = supabase.storage.from("certificates").getPublicUrl(filePath);
+
+    const { publicUrl, error: urlError } = await supabase.storage
+      .from("certificates")
+      .getPublicUrl(filePath);
+
+    if (urlError) {
+      throw urlError;
+    }
 
     const { data: insertedCertificate, error: dbError } = await supabase
       .from("certificates")
@@ -466,49 +750,117 @@ app.post("/upload", upload.single("file"), async (req, res) => {
         user_id: user_id,
         title,
         file_path: publicUrl,
-        status,
+        status: status || "pending",
         tag_id: tag_id,
-      });
+        activity_date: formattedActivityDate,
+      })
+      .single();
 
     if (dbError) {
-      throw new Error(`Error inserting to database: ${dbError.message}`);
-    }
-    if (urlError) {
-      throw new Error(`Error getting file URL: ${urlError.message}`);
+      throw dbError;
     }
 
     res
       .status(200)
       .json({ success: true, data: { publicUrl }, insertedCertificate });
-    console.log({ publicUrl });
   } catch (error) {
+    console.error(error);
+    if (error.message.includes("time zone")) {
+      return res.status(500).json({
+        success: false,
+        error:
+          "Invalid time zone format. Please provide a valid time zone offset.",
+      });
+    }
     res.status(500).json({ success: false, error: error.message });
   }
 });
 
-app.post("/tags", async (req, res) => {
-  try {
-    const { name, value, category_id } = req.body;
-    const { data, error } = await supabase
-      .from("tags")
-      .insert([{ name, value, category_id }]);
-    if (error) {
-      throw error;
-    }
-    res
-      .status(201)
-      .json({ success: true, message: "Tag created successfully" });
-  } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
+// app.post("/upload", upload.single("file"), async (req, res) => {
+//   try {
+//     const file = req.file;
+//     const { user_id, title, status, tag_id, activity_date } = req.body;
+
+//     if (!file) {
+//       return res
+//         .status(400)
+//         .json({ success: false, error: "No file uploaded" });
+//     }
+//     if (!user_id || !title || !tag_id) {
+//       return res
+//         .status(400)
+//         .json({ success: false, error: "Missing required fields" });
+//     }
+
+//     const filePath = `${user_id}/${uuidv4()}_${file.originalname}`;
+//     const formattedActivityDate = moment(activity_date).toISOString();
+
+//     const { data: existingCertificates, error: fetchError } = await supabase
+//       .from("certificates")
+//       .select()
+//       .eq("tag_id", tag_id)
+//       .eq("activity_date", formattedActivityDate)
+//       .single();
+
+//     if (fetchError) {
+//       throw fetchError;
+//     }
+
+//     if (existingCertificates) {
+//       return res.status(400).json({
+//         success: false,
+//         error: "Certificate with the same tag and activity date already exists",
+//       });
+//     }
+
+//     const { data, error } = await supabase.storage
+//       .from("certificates")
+//       .upload(filePath, file.buffer, {
+//         contentType: file.mimetype,
+//       });
+
+//     if (error) {
+//       throw error;
+//     }
+//     const {
+//       data: { publicUrl },
+//       error: urlError,
+//     } = supabase.storage.from("certificates").getPublicUrl(filePath);
+
+//     const { data: insertedCertificate, error: dbError } = await supabase
+//       .from("certificates")
+//       .insert({
+//         user_id: user_id,
+//         title,
+//         file_path: publicUrl,
+//         status,
+//         tag_id: tag_id,
+//         activity_date: formattedActivityDate,
+//       })
+//       .single();
+
+//     if (dbError) {
+//       throw new Error(`Error inserting to database: ${dbError.message}`);
+//     }
+//     if (urlError) {
+//       throw new Error(`Error getting file URL: ${urlError.message}`);
+//     }
+
+//     res
+//       .status(200)
+//       .json({ success: true, data: { publicUrl }, insertedCertificate });
+//     console.log({ publicUrl });
+//   } catch (error) {
+//     res.status(500).json({ success: false, error: error.message });
+//   }
+// });
 
 app.post("/categories", async (req, res) => {
   try {
-    const { name } = req.body;
+    const { name, min_point } = req.body;
     const { data, error } = await supabase
       .from("categories")
-      .insert([{ name }]);
+      .insert([{ name, min_point }]);
     if (error) {
       throw error;
     }
@@ -517,6 +869,134 @@ app.post("/categories", async (req, res) => {
       .json({ success: true, message: "Category created successfully" });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+app.post("/tags", async (req, res) => {
+  try {
+    const { category_id, activity_id, value, name } = req.body;
+
+    // Validasi input
+    if (!category_id || !activity_id || !value || !name) {
+      return res
+        .status(400)
+        .json({ success: false, error: "All fields are required" });
+    }
+
+    // Insert ke dalam tabel tags di Supabase
+    const { data, error } = await supabase
+      .from("tags")
+      .insert([{ category_id, activity_id, value, name }])
+      .single();
+
+    if (error) {
+      throw error;
+    }
+
+    res.status(201).json({ success: true, data });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+app.post("/activities", async (req, res) => {
+  try {
+    const { category_id, name } = req.body; // Destructure 'category_id' dan 'name' dari req.body
+
+    // Insert ke dalam tabel activities di Supabase
+    const { data, error } = await supabase
+      .from("activities")
+      .insert([{ category_id, name }])
+      .single(); // Mengembalikan hasil tunggal dari operasi insert
+
+    if (error) {
+      throw error;
+    }
+
+    res.status(201).json({ success: true, data });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+app.get("/categories/:category_id/tags", async (req, res) => {
+  try {
+    const { category_id } = req.params; // Get the category_id from URL parameters
+
+    if (!category_id) {
+      return res.status(400).json({ error: "Category ID is required" });
+    }
+
+    const { data, error } = await supabase
+      .from("tags")
+      .select("*")
+      .eq("category_id", category_id); // Filter tags by category_id
+
+    if (error) {
+      throw error;
+    }
+
+    const tags = data.map((tag) => ({
+      id: tag.tag_id,
+      name: tag.name,
+      value: tag.value,
+      category_id: tag.category_id,
+    }));
+
+    res.status(200).json(tags);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get("/categories/:categoryId/activities", async (req, res) => {
+  try {
+    const { categoryId } = req.params;
+    const { data, error } = await supabase
+      .from("activities")
+      .select("*")
+      .eq("category_id", categoryId);
+
+    if (error) {
+      throw error;
+    }
+
+    const activities = data.map((activity) => ({
+      id: activity.activity_id,
+      name: activity.name,
+      category_id: activity.category_id,
+    }));
+    activities.sort((a, b) => a.name.localeCompare(b.name));
+
+    res.status(200).json(activities);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get("/activities/:activityId/tags", async (req, res) => {
+  try {
+    const { activityId } = req.params;
+    const { data, error } = await supabase
+      .from("tags")
+      .select("*")
+      .eq("activity_id", activityId);
+
+    if (error) {
+      throw error;
+    }
+
+    const tags = data.map((tag) => ({
+      id: tag.tag_id,
+      name: tag.name,
+      value: tag.value,
+      activity_id: tag.activity_id,
+    }));
+    tags.sort((a, b) => a.name.localeCompare(b.name));
+
+    res.status(200).json(tags);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
   }
 });
 
@@ -533,8 +1013,30 @@ app.get("/tags", async (req, res) => {
       name: tag.name,
       value: tag.value,
       category_id: tag.category_id,
+      activity_id: tag.activity_id,
     }));
+    tags.sort((a, b) => a.name.localeCompare(b.name));
+
     res.status(200).json(tags);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get("/activities", async (req, res) => {
+  try {
+    const { data, error } = await supabase.from("activities").select("*");
+
+    if (error) {
+      throw error;
+    }
+    const activities = data.map((activity) => ({
+      id: activity.activity_id,
+      name: activity.name,
+      category_id: activity.category_id,
+    }));
+    res.status(200).json(activities);
+    console.log(activities);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -554,7 +1056,7 @@ app.get("/tagsall", async (req, res) => {
   }
 });
 
-const PORT = process.env.PORT || 2000;
+const PORT = process.env.PORT;
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
 });
