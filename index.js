@@ -468,6 +468,83 @@ app.post("/login", async (req, res) => {
   }
 });
 
+// Update category
+app.put("/category/:id", async (req, res) => {
+  const { id } = req.params;
+  const { name, min_point, is_visible } = req.body;
+
+  const updates = {};
+  if (name !== undefined) updates.name = name;
+  if (min_point !== undefined) updates.min_point = min_point;
+  if (is_visible !== undefined) updates.is_visible = is_visible;
+
+  try {
+    const { data, error } = await supabase
+      .from("categories")
+      .update(updates)
+      .eq("category_id", id);
+
+    if (error) {
+      throw error;
+    }
+
+    res.status(200).json({ success: true, data });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Update activity
+app.put("/activity/:id", async (req, res) => {
+  const { id } = req.params;
+  const { name, is_visible } = req.body;
+
+  const updates = {};
+  if (name !== undefined) updates.name = name;
+  if (is_visible !== undefined) updates.is_visible = is_visible;
+
+  try {
+    const { data, error } = await supabase
+      .from("activities")
+      .update(updates)
+      .eq("activity_id", id);
+
+    if (error) {
+      throw error;
+    }
+
+    res.status(200).json({ success: true, data });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Update tag
+app.put("/tag/:id", async (req, res) => {
+  const { id } = req.params;
+  const { name, value, is_visible } = req.body;
+
+  const updates = {};
+  if (name !== undefined) updates.name = name;
+  if (value !== undefined) updates.value = value;
+  if (is_visible !== undefined) updates.is_visible = is_visible;
+
+  try {
+    const { data, error } = await supabase
+      .from("tags")
+      .update(updates)
+      .eq("tag_id", id);
+
+    if (error) {
+      throw error;
+    }
+
+    res.status(200).json({ success: true, data });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 app.post("/user", async (req, res) => {
   try {
     const { authorization } = req.headers;
@@ -616,7 +693,7 @@ app.get("/management", async (req, res) => {
       return {
         id: category.category_id,
         name: category.name,
-        min: category.min_point,
+        min_point: category.min_point,
         activities: categoryActivities,
       };
     });
@@ -726,23 +803,16 @@ app.post("/upload", upload.single("file"), async (req, res) => {
       });
     }
 
-    const { data: uploadData, error: uploadError } = await supabase.storage
+    const { data, error } = await supabase.storage
       .from("certificates")
       .upload(filePath, file.buffer, {
         contentType: file.mimetype,
       });
 
-    if (uploadError) {
-      throw uploadError;
-    }
-
-    const { publicUrl, error: urlError } = await supabase.storage
-      .from("certificates")
-      .getPublicUrl(filePath);
-
-    if (urlError) {
-      throw urlError;
-    }
+    const {
+      data: { publicUrl },
+      error: urlError,
+    } = supabase.storage.from("certificates").getPublicUrl(filePath);
 
     const { data: insertedCertificate, error: dbError } = await supabase
       .from("certificates")
@@ -753,11 +823,13 @@ app.post("/upload", upload.single("file"), async (req, res) => {
         status: status || "pending",
         tag_id: tag_id,
         activity_date: formattedActivityDate,
-      })
-      .single();
+      });
 
     if (dbError) {
-      throw dbError;
+      throw new Error(`Error inserting to database: ${dbError.message}`);
+    }
+    if (urlError) {
+      throw new Error(`Error getting file URL: ${urlError.message}`);
     }
 
     res
