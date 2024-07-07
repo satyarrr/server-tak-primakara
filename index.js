@@ -6,6 +6,7 @@ const cors = require("cors");
 const { v4: uuidv4 } = require("uuid");
 const jwt = require("jsonwebtoken");
 const moment = require("moment");
+const { startOfMonth, endOfMonth, format, toDate } = require("date-fns");
 require("dotenv").config();
 
 const supabaseUrl = process.env.SUPABASE_URL;
@@ -15,6 +16,7 @@ const supabase = createClient(supabaseUrl, supabaseKey);
 const app = express();
 const upload = multer();
 const bodyParser = require("body-parser");
+const { sumBy } = require("lodash");
 
 app.use(cors());
 const corsOptions = {
@@ -374,57 +376,95 @@ const calculateTotalPoints = (certificates, tags, categories) => {
   return totalPoints;
 };
 
+const getApprovedCertificates = (certificates) => {
+  return certificates.filter((certificate) => certificate.status === "approve");
+};
+
+const getApprovedCurrentMonthCertificates = (certificates) => {
+  return getApprovedCertificates(certificates).filter((certificate) => {
+    const certificateTimeStamp = new Date(certificate.time_stamp);
+
+    return (
+      certificateTimeStamp >= startOfMonth(new Date()) &&
+      certificateTimeStamp <= endOfMonth(new Date())
+    );
+  });
+};
+
 app.get("/users/mahasiswa", async (req, res) => {
   try {
     // Ambil data pengguna mahasiswa
     const { data: mahasiswa, error: mahasiswaError } = await supabase
       .from("users")
-      .select("user_id, full_name, nim")
+      .select("user_id, full_name, nim, certificates(*, tag:tag_id(*))")
       .eq("role", "mahasiswa"); // Filter hanya untuk peran "mahasiswa"
 
     if (mahasiswaError) {
       throw mahasiswaError;
     }
 
+    const formattedMahasiswa = mahasiswa.map((user) => {
+      return {
+        ...user,
+        totalPoints: sumBy(
+          getApprovedCertificates(user.certificates),
+          "tag.value"
+        ),
+        currentMonthPoints: sumBy(
+          getApprovedCurrentMonthCertificates(user.certificates),
+          "tag.value"
+        ),
+      };
+    });
+
     // Ambil sertifikat untuk setiap pengguna mahasiswa
-    const mahasiswaWithCertificates = await Promise.all(
-      mahasiswa.map(async (user) => {
-        const { data: certificates, error: certError } = await supabase
-          .from("certificates")
-          .select("tag_id")
-          .eq("user_id", user.user_id)
-          .eq("status", "approve");
+    // const mahasiswaWithCertificates = await Promise.all(
+    //   mahasiswa.map(async (user) => {
+    //     const { data: certificates, error: certError } = await supabase
+    //       .from("certificates")
+    //       .select("tag_id, time_stamp") // Tambahkan time_stamp ke hasil seleksi
+    //       .eq("user_id", user.user_id)
+    //       .eq("status", "approve");
 
-        if (certError) {
-          throw certError;
-        }
+    //     if (certError) {
+    //       throw certError;
+    //     }
 
-        // Ambil nilai (value) dari setiap tag dan jumlahkan
-        const totalPoints = await Promise.all(
-          certificates.map(async (certificate) => {
-            const { data: tag, error: tagError } = await supabase
-              .from("tags")
-              .select("value")
-              .eq("tag_id", certificate.tag_id)
-              .single();
+    //     // Ambil nilai (value) dari setiap tag dan jumlahkan
+    //     const totalPoints = await Promise.all(
+    //       certificates.map(async (certificate) => {
+    //         const { data: tag, error: tagError } = await supabase
+    //           .from("tags")
+    //           .select("value")
+    //           .eq("tag_id", certificate.tag_id)
+    //           .single();
 
-            if (tagError) {
-              throw tagError;
-            }
+    //         if (tagError) {
+    //           throw tagError;
+    //         }
 
-            return tag.value;
-          })
-        );
+    //         return {
+    //           value: tag.value,
+    //           time_stamp: certificate.time_stamp, // Sertakan time_stamp dalam hasil
+    //         };
+    //       })
+    //     );
 
-        // Jumlahkan total poin untuk pengguna
-        const totalPointsSum = totalPoints.reduce((acc, curr) => acc + curr, 0);
+    //     // Filter sertifikasi yang terjadi dalam satu bulan terakhir
+    //     const today = new Date();
+    //     const lastMonth = new Date(today);
+    //     lastMonth.setMonth(lastMonth.getMonth() - 1);
 
-        // Tambahkan total poin ke dalam data pengguna
-        return { ...user, totalPoints: totalPointsSum };
-      })
-    );
+    //     const pointsLastMonth = totalPoints
+    //       .filter((cert) => new Date(cert.time_stamp) > lastMonth)
+    //       .reduce((acc, curr) => acc + curr.value, 0);
 
-    res.status(200).json(mahasiswaWithCertificates);
+    //     // Tambahkan total poin ke dalam data pengguna
+    //     return { ...user, totalPoints: pointsLastMonth };
+    //   })
+    // );
+
+    res.status(200).json(formattedMahasiswa);
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }
@@ -570,6 +610,81 @@ app.post("/user", async (req, res) => {
   }
 });
 
+app.get("/certificates/approved-categories", async (req, res) => {
+  try {
+    // Fetch all approved certificates
+    const { data: certificates, error: certError } = await supabase
+      .from("certificates")
+      .select("*")
+      .eq("status", "approve");
+
+    if (certError) {
+      throw certError;
+    }
+
+    const categoryCounts = {};
+
+    for (const certificate of certificates) {
+      const { tag_id } = certificate;
+
+      // Fetch tag information
+      const { data: tag, error: tagError } = await supabase
+        .from("tags")
+        .select("activity_id")
+        .eq("tag_id", tag_id)
+        .single();
+
+      if (tagError) {
+        throw tagError;
+      }
+
+      // Fetch activity information
+      const { data: activity, error: activityError } = await supabase
+        .from("activities")
+        .select("category_id")
+        .eq("activity_id", tag.activity_id)
+        .single();
+
+      if (activityError) {
+        throw activityError;
+      }
+
+      // Fetch category information
+      const { data: category, error: categoryError } = await supabase
+        .from("categories")
+        .select("name")
+        .eq("category_id", activity.category_id)
+        .single();
+
+      if (categoryError) {
+        throw categoryError;
+      }
+
+      const categoryName = category.name;
+      if (categoryCounts[categoryName]) {
+        categoryCounts[categoryName] += 1;
+      } else {
+        categoryCounts[categoryName] = 1;
+      }
+    }
+
+    const totalCategories = Object.keys(categoryCounts).length;
+    const totalCertificates = certificates.length;
+    const averageCertificates = totalCategories
+      ? totalCertificates / totalCategories
+      : 0;
+
+    res.status(200).json({
+      success: true,
+      totalCategories,
+      totalCertificates,
+      averageCertificates,
+      categoryCounts,
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
 app.get("/certificates/all-with-users", async (req, res) => {
   try {
     const { data: certificates, error: certError } = await supabase
@@ -678,12 +793,14 @@ app.get("/management", async (req, res) => {
               id: tag.tag_id,
               name: tag.name,
               value: tag.value,
+              is_visible: tag.is_visible,
             }));
 
           // Return activity dengan tags-nya
           return {
             id: activity.activity_id,
             name: activity.name,
+            is_visible: activity.is_visible,
             // category_id: activity.category_id,
             tags: activityTags,
           };
@@ -694,6 +811,7 @@ app.get("/management", async (req, res) => {
         id: category.category_id,
         name: category.name,
         min_point: category.min_point,
+        is_visible: category.is_visible,
         activities: categoryActivities,
       };
     });
@@ -716,6 +834,7 @@ app.get("/categories", async (req, res) => {
       id: category.category_id,
       name: category.name,
       min: category.min_point,
+      is_visible: category.is_visible,
     }));
     categories.sort((a, b) => a.name.localeCompare(b.name));
 
@@ -1037,6 +1156,7 @@ app.get("/categories/:categoryId/activities", async (req, res) => {
       id: activity.activity_id,
       name: activity.name,
       category_id: activity.category_id,
+      is_visible: activity.is_visible,
     }));
     activities.sort((a, b) => a.name.localeCompare(b.name));
 
@@ -1063,6 +1183,7 @@ app.get("/activities/:activityId/tags", async (req, res) => {
       name: tag.name,
       value: tag.value,
       activity_id: tag.activity_id,
+      is_visible: tag.is_visible,
     }));
     tags.sort((a, b) => a.name.localeCompare(b.name));
 
