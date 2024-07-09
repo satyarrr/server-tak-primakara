@@ -45,8 +45,7 @@ This repository contains the backend code for managing certificates, users, and 
 
 1. Clone the repository:
    ```bash
-   git clone https://github.com/yourusername/certificate-management-backend.git
-   cd certificate-management-backend
+   git clone https://github.com/satyarrr/server-tak-primakara.git
    ```
 
 2. Install dependencies:
