@@ -6,7 +6,13 @@ const cors = require("cors");
 const { v4: uuidv4 } = require("uuid");
 const jwt = require("jsonwebtoken");
 const moment = require("moment");
-const { startOfMonth, endOfMonth, format, toDate } = require("date-fns");
+const {
+  startOfMonth,
+  endOfMonth,
+  format,
+  toDate,
+  formatDate,
+} = require("date-fns");
 require("dotenv").config();
 
 const supabaseUrl = process.env.SUPABASE_URL;
@@ -905,14 +911,14 @@ app.post("/upload", upload.single("file"), async (req, res) => {
     }
 
     const filePath = `${user_id}/${uuidv4()}_${file.originalname}`;
-    const formattedActivityDate = moment(activity_date).format();
+    const activityFormat = moment(activity_date).format();
 
     // Check if there's already a certificate with the same tag_id and activity_date
     const { data: existingCertificates, error: queryError } = await supabase
       .from("certificates")
       .select("*")
       .eq("tag_id", tag_id)
-      .eq("activity_date", formattedActivityDate);
+      .eq("activity_date", activityFormat);
 
     if (queryError) {
       throw queryError;
@@ -946,7 +952,7 @@ app.post("/upload", upload.single("file"), async (req, res) => {
         file_path: publicUrl,
         status: status || "pending",
         tag_id: tag_id,
-        activity_date: formattedActivityDate,
+        activity_date: activityFormat,
       });
 
     if (dbError) {
