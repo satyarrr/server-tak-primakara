@@ -6,7 +6,13 @@ const cors = require("cors");
 const { v4: uuidv4 } = require("uuid");
 const jwt = require("jsonwebtoken");
 const moment = require("moment");
-const { startOfMonth, endOfMonth, format, toDate } = require("date-fns");
+const {
+  startOfMonth,
+  endOfMonth,
+  format,
+  toDate,
+  formatDate,
+} = require("date-fns");
 require("dotenv").config();
 
 const supabaseUrl = process.env.SUPABASE_URL;
@@ -61,9 +67,16 @@ app.post(
     try {
       const file = req.files.file[0];
       const image = req.files.image[0];
+      const { title, tag_id, activity_date } = req.body;
 
       if (!file || !image) {
         return res.status(400).json({ error: "No file or image uploaded" });
+      }
+
+      if (!title || !tag_id || !activity_date) {
+        return res
+          .status(400)
+          .json({ success: false, error: "Missing required fields" });
       }
 
       const image_url = await uploadImageToSupabase(image);
@@ -73,10 +86,12 @@ app.post(
       const worksheet = workbook.Sheets[sheetName];
       const data = XLSX.utils.sheet_to_json(worksheet);
 
+      const formattedActivityDate = moment(activity_date).format();
+
       const certificates = [];
 
       for (const row of data) {
-        const { nim, tag } = row;
+        const { nim, full_name } = row;
 
         const { data: users, error: userError } = await supabase
           .from("users")
@@ -89,23 +104,13 @@ app.post(
           continue;
         }
 
-        const { data: tags, error: tagError } = await supabase
-          .from("tags")
-          .select("tag_id")
-          .eq("name", tag)
-          .single();
-
-        if (tagError || !tags) {
-          console.warn(`Tag with name ${tag_name} not found`);
-          continue;
-        }
-
         const newCertificate = {
           user_id: users.user_id,
-          title: "Certificate From Kemahasiswaan",
+          title: title || "Certificate From Kemahasiswaan",
           file_path: image_url,
           status: "approve",
-          tag_id: tags.tag_id,
+          tag_id: tag_id,
+          activity_date: formattedActivityDate,
         };
 
         certificates.push(newCertificate);
@@ -302,11 +307,16 @@ app.get("/user/:user_id/mahasiswa", async (req, res) => {
     const tags = await getTags(certificates);
     const categories = await getCategories();
 
-    const totalPoints = calculateTotalPoints(certificates, tags, categories);
+    const { totalPoints, totalPointsAll } = calculateTotalPoints(
+      certificates,
+      tags,
+      categories
+    );
 
     res.status(200).json({
       full_name: user.full_name,
       nim: user.nim,
+      totalPointsAll: totalPointsAll,
       totalPoints: totalPoints,
     });
   } catch (error) {
@@ -357,8 +367,29 @@ const getCategories = async () => {
   return data;
 };
 
+// const calculateTotalPoints = (certificates, tags, categories) => {
+//   const totalPoints = {};
+//   categories.forEach((category) => {
+//     totalPoints[category.name] = { points: 0, min_point: category.min_point };
+//   });
+
+//   certificates.forEach((certificate) => {
+//     const tag = tags.find((tag) => certificate.tag_id == tag.tag_id);
+//     const category = categories.find(
+//       (category) => category.category_id === tag.category_id
+//     );
+//     if (category) {
+//       totalPoints[category.name].points += tag.value;
+//     }
+//   });
+
+//   return totalPoints;
+// };
+
 const calculateTotalPoints = (certificates, tags, categories) => {
   const totalPoints = {};
+  let totalPointsAll = 0;
+
   categories.forEach((category) => {
     totalPoints[category.name] = { points: 0, min_point: category.min_point };
   });
@@ -370,10 +401,11 @@ const calculateTotalPoints = (certificates, tags, categories) => {
     );
     if (category) {
       totalPoints[category.name].points += tag.value;
+      totalPointsAll += tag.value;
     }
   });
 
-  return totalPoints;
+  return { totalPoints, totalPointsAll };
 };
 
 const getApprovedCertificates = (certificates) => {
@@ -390,6 +422,33 @@ const getApprovedCurrentMonthCertificates = (certificates) => {
     );
   });
 };
+
+// app.get("/categories-activities-tags", async (req, res) => {
+//   try {
+//     const { data: categories, error: categoriesError } = await supabase
+//       .from("categories")
+//       .select(
+//         `
+//         *,
+//         activities (
+//           *,
+//           tags (*)
+//         )
+//       `
+//       )
+//       .eq("is_visible", true)
+//       .eq("activities.is_visible", true)
+//       .eq("activities.tags.is_visible", true);
+
+//     if (categoriesError) {
+//       throw categoriesError;
+//     }
+
+//     res.status(200).json(categories);
+//   } catch (error) {
+//     res.status(500).json({ success: false, error: error.message });
+//   }
+// });
 
 app.get("/users/mahasiswa", async (req, res) => {
   try {
@@ -416,54 +475,6 @@ app.get("/users/mahasiswa", async (req, res) => {
         ),
       };
     });
-
-    // Ambil sertifikat untuk setiap pengguna mahasiswa
-    // const mahasiswaWithCertificates = await Promise.all(
-    //   mahasiswa.map(async (user) => {
-    //     const { data: certificates, error: certError } = await supabase
-    //       .from("certificates")
-    //       .select("tag_id, time_stamp") // Tambahkan time_stamp ke hasil seleksi
-    //       .eq("user_id", user.user_id)
-    //       .eq("status", "approve");
-
-    //     if (certError) {
-    //       throw certError;
-    //     }
-
-    //     // Ambil nilai (value) dari setiap tag dan jumlahkan
-    //     const totalPoints = await Promise.all(
-    //       certificates.map(async (certificate) => {
-    //         const { data: tag, error: tagError } = await supabase
-    //           .from("tags")
-    //           .select("value")
-    //           .eq("tag_id", certificate.tag_id)
-    //           .single();
-
-    //         if (tagError) {
-    //           throw tagError;
-    //         }
-
-    //         return {
-    //           value: tag.value,
-    //           time_stamp: certificate.time_stamp, // Sertakan time_stamp dalam hasil
-    //         };
-    //       })
-    //     );
-
-    //     // Filter sertifikasi yang terjadi dalam satu bulan terakhir
-    //     const today = new Date();
-    //     const lastMonth = new Date(today);
-    //     lastMonth.setMonth(lastMonth.getMonth() - 1);
-
-    //     const pointsLastMonth = totalPoints
-    //       .filter((cert) => new Date(cert.time_stamp) > lastMonth)
-    //       .reduce((acc, curr) => acc + curr.value, 0);
-
-    //     // Tambahkan total poin ke dalam data pengguna
-    //     return { ...user, totalPoints: pointsLastMonth };
-    //   })
-    // );
-
     res.status(200).json(formattedMahasiswa);
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
@@ -900,14 +911,14 @@ app.post("/upload", upload.single("file"), async (req, res) => {
     }
 
     const filePath = `${user_id}/${uuidv4()}_${file.originalname}`;
-    const formattedActivityDate = moment(activity_date).format();
+    const activityFormat = moment(activity_date).format();
 
     // Check if there's already a certificate with the same tag_id and activity_date
     const { data: existingCertificates, error: queryError } = await supabase
       .from("certificates")
       .select("*")
       .eq("tag_id", tag_id)
-      .eq("activity_date", formattedActivityDate);
+      .eq("activity_date", activityFormat);
 
     if (queryError) {
       throw queryError;
@@ -941,7 +952,7 @@ app.post("/upload", upload.single("file"), async (req, res) => {
         file_path: publicUrl,
         status: status || "pending",
         tag_id: tag_id,
-        activity_date: formattedActivityDate,
+        activity_date: activityFormat,
       });
 
     if (dbError) {
