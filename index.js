@@ -301,11 +301,16 @@ app.get("/user/:user_id/mahasiswa", async (req, res) => {
     const tags = await getTags(certificates);
     const categories = await getCategories();
 
-    const totalPoints = calculateTotalPoints(certificates, tags, categories);
+    const { totalPoints, totalPointsAll } = calculateTotalPoints(
+      certificates,
+      tags,
+      categories
+    );
 
     res.status(200).json({
       full_name: user.full_name,
       nim: user.nim,
+      totalPointsAll: totalPointsAll,
       totalPoints: totalPoints,
     });
   } catch (error) {
@@ -356,8 +361,29 @@ const getCategories = async () => {
   return data;
 };
 
+// const calculateTotalPoints = (certificates, tags, categories) => {
+//   const totalPoints = {};
+//   categories.forEach((category) => {
+//     totalPoints[category.name] = { points: 0, min_point: category.min_point };
+//   });
+
+//   certificates.forEach((certificate) => {
+//     const tag = tags.find((tag) => certificate.tag_id == tag.tag_id);
+//     const category = categories.find(
+//       (category) => category.category_id === tag.category_id
+//     );
+//     if (category) {
+//       totalPoints[category.name].points += tag.value;
+//     }
+//   });
+
+//   return totalPoints;
+// };
+
 const calculateTotalPoints = (certificates, tags, categories) => {
   const totalPoints = {};
+  let totalPointsAll = 0;
+
   categories.forEach((category) => {
     totalPoints[category.name] = { points: 0, min_point: category.min_point };
   });
@@ -369,10 +395,11 @@ const calculateTotalPoints = (certificates, tags, categories) => {
     );
     if (category) {
       totalPoints[category.name].points += tag.value;
+      totalPointsAll += tag.value;
     }
   });
 
-  return totalPoints;
+  return { totalPoints, totalPointsAll };
 };
 
 const getApprovedCertificates = (certificates) => {
@@ -390,32 +417,32 @@ const getApprovedCurrentMonthCertificates = (certificates) => {
   });
 };
 
-app.get("/categories-activities-tags", async (req, res) => {
-  try {
-    const { data: categories, error: categoriesError } = await supabase
-      .from("categories")
-      .select(
-        `
-        *,
-        activities (
-          *,
-          tags (*)
-        )
-      `
-      )
-      .eq("is_visible", true)
-      .eq("activities.is_visible", true)
-      .eq("activities.tags.is_visible", true);
+// app.get("/categories-activities-tags", async (req, res) => {
+//   try {
+//     const { data: categories, error: categoriesError } = await supabase
+//       .from("categories")
+//       .select(
+//         `
+//         *,
+//         activities (
+//           *,
+//           tags (*)
+//         )
+//       `
+//       )
+//       .eq("is_visible", true)
+//       .eq("activities.is_visible", true)
+//       .eq("activities.tags.is_visible", true);
 
-    if (categoriesError) {
-      throw categoriesError;
-    }
+//     if (categoriesError) {
+//       throw categoriesError;
+//     }
 
-    res.status(200).json(categories);
-  } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
+//     res.status(200).json(categories);
+//   } catch (error) {
+//     res.status(500).json({ success: false, error: error.message });
+//   }
+// });
 
 app.get("/users/mahasiswa", async (req, res) => {
   try {
