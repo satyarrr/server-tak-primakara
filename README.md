@@ -13,33 +13,26 @@ This repository contains the backend code for managing certificates, users, and 
 - [Setup](#setup)
 - [Environment Variables](#environment-variables)
 - [API Endpoints](#api-endpoints)
-  - [Admin Upload Certificate](#admin-upload-certificate)
-  - [User Certificates and Points](#user-certificates-and-points)
-  - [Login](#login)
-  - [Update Category](#update-category)
-  - [Update Activity](#update-activity)
-  - [Update Tag](#update-tag)
-  - [Get Mahasiswa](#get-mahasiswa)
 
 ## Features
 
 - Upload and manage certificates
 - Fetch user certificates and calculate points
 - User authentication with JWT
-- Manage categories, activities, and tags
+- Manage categories, activities, sub_activites, tag, and users
 
 ## Technologies Used
 
-- Node.js
-- Express.js
-- Supabase
-- Multer
-- XLSX
-- CORS
-- JSON Web Token (JWT)
-- Moment.js
-- Date-fns
-- Lodash
+- [Node.js](https://nodejs.org/)
+- [Express.js](https://expressjs.com/)
+- [Supabase](https://supabase.com/)
+- [Multer](https://www.npmjs.com/package/multer)
+- [XLSX](https://www.npmjs.com/package/xlsx)
+- [CORS](https://www.npmjs.com/package/cors)
+- [JSON Web Token (JWT)](https://www.npmjs.com/package/jsonwebtoken)
+- [Moment.js](https://www.npmjs.com/package/moment)
+- [Date-fns](https://www.npmjs.com/package/date-fns)
+- [Lodash](https://www.npmjs.com/package/lodash)
 
 ## Setup
 
