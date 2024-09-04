@@ -1,4 +1,3 @@
-Based on the provided `index.js` file, here is a detailed `README.md` for your GitHub repository:
 
 ---
 
