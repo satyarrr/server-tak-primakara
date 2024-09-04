@@ -176,6 +176,140 @@ Get all mahasiswa (students) with their total points and current month points.
   - `200 OK` with the list of mahasiswa
   - `500 Internal Server Error` on server error
 
+### Get Approved Categories and Certificate Statistics
+
+**Retrieve statistics of approved certificates grouped by their categories.**
+
+- **URL:** `/certificates/approved-categories`
+- **Method:** `GET`
+- **Response:**
+  - **200 OK** with the statistics of approved certificates:
+    - **Body:**
+      - `success` (boolean): Indicates if the request was successful.
+      - `totalCategories` (number): Total number of unique categories.
+      - `totalCertificates` (number): Total number of approved certificates.
+      - `averageCertificates` (number): Average number of certificates per category.
+      - `categoryCounts` (object): An object where the keys are category names and the values are the number of certificates in that category.
+    - **Example Response:**
+      ```json
+      {
+        "success": true,
+        "totalCategories": 3,
+        "totalCertificates": 15,
+        "averageCertificates": 5,
+        "categoryCounts": {
+          "Category A": 6,
+          "Category B": 4,
+          "Category C": 5
+        }
+      }
+      ```
+  - **500 Internal Server Error** on server error:
+    - **Body:**
+      - `success` (boolean): Indicates that an error occurred.
+      - `error` (string): A message describing the error.
+    - **Example Response:**
+      ```json
+      {
+        "success": false,
+        "error": "Internal Server Error"
+      }
+      ```
+
+### Get All Certificates with User Information
+
+**Retrieve all certificates that are neither approved nor rejected, along with the user information associated with them.**
+
+- **URL:** `/certificates/all-with-users`
+- **Method:** `GET`
+- **Response:**
+  - **200 OK** with the list of certificates and user information:
+    - **Body:**
+      - `success` (boolean): Indicates if the request was successful.
+      - `certificates` (array): An array of certificate objects, each containing:
+        - `certificate_id` (string): The unique ID of the certificate.
+        - `status` (string): The status of the certificate.
+        - `user` (object): An object containing user information, including:
+          - `full_name` (string): The full name of the user.
+          - `nim` (string): The NIM (student ID number) of the user.
+    - **Example Response:**
+      ```json
+      {
+        "success": true,
+        "certificates": [
+          {
+            "certificate_id": "1",
+            "status": "pending",
+            "user": {
+              "full_name": "Jane Doe",
+              "nim": "456789"
+            }
+          },
+          {
+            "certificate_id": "2",
+            "status": "pending",
+            "user": {
+              "full_name": "John Smith",
+              "nim": "123456"
+            }
+          }
+        ]
+      }
+      ```
+  - **500 Internal Server Error** on server error:
+    - **Body:**
+      - `success` (boolean): Indicates that an error occurred.
+      - `error` (string): A message describing the error.
+    - **Example Response:**
+      ```json
+      {
+        "success": false,
+        "error": "Internal Server Error"
+      }
+      ```
+
+### Get All Certificates
+
+**Retrieve all certificates in the database.**
+
+- **URL:** `/certificates/all`
+- **Method:** `GET`
+- **Response:**
+  - **200 OK** with the list of all certificates:
+    - **Body:**
+      - `success` (boolean): Indicates if the request was successful.
+      - `certificates` (array): An array of certificate objects.
+    - **Example Response:**
+      ```json
+      {
+        "success": true,
+        "certificates": [
+          {
+            "certificate_id": "1",
+            "status": "approve",
+            ...
+          },
+          {
+            "certificate_id": "2",
+            "status": "pending",
+            ...
+          }
+        ]
+      }
+      ```
+  - **500 Internal Server Error** on server error:
+    - **Body:**
+      - `success` (boolean): Indicates that an error occurred.
+      - `error` (string): A message describing the error.
+    - **Example Response:**
+      ```json
+      {
+        "success": false,
+        "error": "Internal Server Error"
+      }
+      ```
+
 ---
+
 
 This README should help users understand the purpose and usage of your backend code. You can customize and expand it further as needed.
