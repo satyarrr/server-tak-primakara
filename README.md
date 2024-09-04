@@ -50,7 +50,10 @@ This repository contains the backend code for managing certificates, users, and 
 
 4. Run the server:
    ```bash
-   npm start
+   npm start 
+   ```
+   ```bash
+   npm run dev 
    ```
 
 ## Environment Variables
